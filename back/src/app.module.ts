@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { SupersetModule } from './superset/superset.module';
 
 @Module({
-  imports: [],
+  imports: [SupersetModule],
   controllers: [AppController],
   providers: [AppService],
 })
