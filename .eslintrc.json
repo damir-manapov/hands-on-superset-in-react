@@ -1,0 +1,16 @@
+{
+  "root": true,
+  "rules": {
+    "prettier/prettier": "warn"
+  },
+  "ignorePatterns": [
+    "node_modules",
+    "dist",
+    "build",
+    ".next",
+    "coverage",
+    "*.config.js",
+    "*.config.ts",
+    "*.config.mjs"
+  ]
+}

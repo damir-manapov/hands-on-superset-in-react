@@ -1,16 +1,124 @@
-## Hands-on: Trino + Iceberg (Nessie) + MinIO + Superset
+## Hands-on: Embedding Superset in React
 
-Research environment for experimenting with Trino, Iceberg (using Project Nessie as the catalog), MinIO (S3-compatible object storage), and Apache Superset for visualization.
+This project demonstrates how to embed Apache Superset dashboards and charts into a React application. It includes a NestJS backend for handling Superset API authentication and a React frontend that embeds Superset visualizations.
 
-### Stack
+This project is a pnpm monorepo containing:
+
+- **back**: NestJS backend application (handles Superset API authentication and proxying)
+- **ui**: React frontend application (embeds Superset dashboards and charts)
+
+## Overview
+
+This project shows how to:
+
+1. Set up Apache Superset with a data stack (Trino + Iceberg + MinIO)
+2. Embed Superset dashboards and charts into a React application
+3. Handle authentication and API proxying through a NestJS backend
+4. Create a seamless integration experience
+
+## Architecture
+
+```
+┌─────────────────┐
+│   React UI      │  ← Embeds Superset dashboards/charts
+│   (Port 3000)   │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│  NestJS Backend │  ← Handles Superset API auth & proxying
+│   (Port 3001)   │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│   Superset      │  ← BI Platform (Port 8088)
+│  (Docker)       │
+└────────┬────────┘
+         │
+         ▼
+┌─────────────────┐
+│     Trino       │  ← Query Engine (Port 8080)
+│  (Docker)       │
+└─────────────────┘
+```
+
+## Getting Started
+
+### Prerequisites
+
+- Node.js >= 18.0.0
+- pnpm >= 8.0.0
+- Docker and Docker Compose
+
+### Installation
+
+1. Install dependencies:
+
+```bash
+pnpm install
+```
+
+2. Start the infrastructure stack (Superset, Trino, MinIO, Nessie):
+
+```bash
+docker compose -f compose/compose.yaml up -d
+```
+
+3. Wait for all services to be healthy (check the logs or health endpoints)
+
+4. Start the development servers:
+
+```bash
+# Terminal 1: Start NestJS backend
+pnpm dev:back
+
+# Terminal 2: Start React frontend
+pnpm dev:ui
+```
+
+The React app will be available at `http://localhost:3000` and will display embedded Superset visualizations.
+
+### Building for Production
+
+```bash
+# Build backend
+pnpm build:back
+
+# Build frontend
+pnpm build:ui
+```
+
+### Linting and Formatting
+
+```bash
+# Lint all packages
+pnpm lint
+
+# Fix linting issues
+pnpm lint:fix
+
+# Format code with Prettier
+pnpm format
+
+# Check formatting
+pnpm format:check
+```
+
+## Infrastructure Stack
+
+The Docker Compose setup includes:
+
+- **Superset**: BI/Visualization platform (`http://localhost:8088`)
+  - Default credentials: `admin` / `admin12345`
+- **Trino**: Query engine for data access (`http://localhost:8080`)
 - **MinIO**: S3-compatible object storage (`http://localhost:9000`, console on `http://localhost:9001`)
-- **Project Nessie**: Iceberg catalog (`http://localhost:19120`)
-- **Trino**: Query engine (`http://localhost:8080`)
-- **Superset**: BI/Visualization (`http://localhost:8088`)
-- **Starter**: A no-op container that waits until all services are healthy
+- **Project Nessie**: Iceberg catalog for data versioning (`http://localhost:19120`)
 
-### Quickstart
-1. Start the stack (use Docker Compose v2 command):
+### Infrastructure Quickstart
+
+1. Start all services:
+
    ```bash
    docker compose -f compose/compose.yaml up -d
    ```
@@ -21,34 +129,45 @@ Research environment for experimenting with Trino, Iceberg (using Project Nessie
    - Trino: `http://localhost:8080/v1/info`
    - Superset: `http://localhost:8088/health`
 
-3. Access UIs:
-   - MinIO console: `http://localhost:9001` — user `admin` / password `admin12345`
-   - Superset: `http://localhost:8088` — user `admin` / password `admin12345`
+3. Access Superset directly:
+   - URL: `http://localhost:8088`
+   - Username: `admin`
+   - Password: `admin12345`
 
-### Trino Iceberg + Nessie configuration
+## Setting Up Superset Data Source
+
+### Connect Superset to Trino
+
+Once Superset is healthy:
+
+1. Open `http://localhost:8088` and log in (`admin` / `admin12345`)
+2. Go to **Settings → Data → Databases → + Database**
+3. Choose **"Trino"** and use the connection URI:
+
+   ```
+   trino://trino@trino:8080
+   ```
+
+   - Username can be any non-empty value (e.g., `trino`)
+
+### Trino Iceberg + Nessie Configuration
+
 Trino is configured with an Iceberg catalog that uses Nessie and stores data in MinIO. The catalog file is at:
 `compose/trino/catalog/iceberg.properties`.
 
-Key settings used:
+Key settings:
+
 - `iceberg.catalog.type=nessie`
 - `iceberg.nessie.uri=http://nessie:19120/api/v2`
 - `iceberg.s3.endpoint=http://minio:9000`
 - `iceberg.s3.path-style-access=true`
 
-### Connect Superset to Trino
-Once Superset is healthy:
-1. Open `http://localhost:8088` and log in (`admin` / `admin12345`).
-2. Go to Settings → Data → Databases → + Database.
-3. Choose “Trino” and use the URI:
-   ```
-   trino://trino@trino:8080
-   ```
-   - Username can be any non-empty value (e.g., `trino`).
+### Sample Data Setup
 
-### Sample SQL in Trino
-Use the Trino web UI (`http://localhost:8080`) or any Trino client.
+You can create sample data in Trino for testing:
+
 ```sql
--- Create a new Iceberg schema (bucket path is optional; data lands in MinIO)
+-- Create a new Iceberg schema
 CREATE SCHEMA IF NOT EXISTS iceberg.demo;
 
 -- Create a sample Iceberg table
@@ -65,14 +184,35 @@ INSERT INTO iceberg.demo.events VALUES (1, current_timestamp, 'hello');
 SELECT * FROM iceberg.demo.events;
 ```
 
-### Tear down
+## Embedding Superset in React
+
+The React application (`ui/`) demonstrates how to embed Superset dashboards and charts. The NestJS backend (`back/`) provides:
+
+- Authentication with Superset API
+- Secure API proxy to avoid CORS issues
+- Token management and refresh
+
+### Project Structure
+
+```
+.
+├── back/          # NestJS backend (Superset API proxy & auth)
+├── ui/            # React frontend (embeds Superset components)
+├── compose/       # Docker Compose setup for infrastructure
+└── package.json   # Root workspace configuration
+```
+
+## Cleanup
+
+Stop and remove all containers:
+
 ```bash
 docker compose -f compose/compose.yaml down -v
 ```
 
-### Notes
-- Credentials in this setup are for local research only. Change them for any persistent/shared use.
-- Superset here uses its container-managed SQLite metadata DB for simplicity.
-- The `starter` service simply blocks after all health checks pass, ensuring `docker compose ps` shows the stack as running and ready.
+## Notes
 
-
+- All credentials in this setup are for local development only. Change them for any persistent/shared use.
+- Superset uses its container-managed SQLite metadata DB for simplicity.
+- The backend should be configured with Superset credentials to handle authentication.
+- The React app uses iframe embedding or Superset's embedding SDK (depending on implementation).
