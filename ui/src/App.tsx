@@ -1,6 +1,7 @@
 import { NavLink, Routes, Route } from 'react-router-dom';
 import DashboardPage from './pages/DashboardPage';
 import RestrictedDashboardPage from './pages/RestrictedDashboardPage';
+import OneChartDashboardsPage from './pages/OneChartDashboardsPage';
 import './App.css';
 
 function App() {
@@ -21,6 +22,12 @@ function App() {
             className={({ isActive }) => (isActive ? 'active' : '')}
           >
             Restricted Dashboard
+          </NavLink>
+          <NavLink
+            to="/one-chart-dashboards"
+            className={({ isActive }) => (isActive ? 'active' : '')}
+          >
+            One Chart Dashboards
           </NavLink>
         </nav>
       </header>
@@ -46,6 +53,14 @@ function App() {
           element={
             <main style={{ width: '100%', boxSizing: 'border-box' }}>
               <RestrictedDashboardPage />
+            </main>
+          }
+        />
+        <Route
+          path="/one-chart-dashboards"
+          element={
+            <main style={{ width: '100%', boxSizing: 'border-box' }}>
+              <OneChartDashboardsPage />
             </main>
           }
         />

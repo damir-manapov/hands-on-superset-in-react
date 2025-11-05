@@ -11,6 +11,7 @@ type UseSupersetDashboardOpts = {
   rls?: Array<{ clause: string }>;
   backoff?: BackoffOpts; // optional override
   debug?: boolean;
+  hideControls?: boolean; // Hide all controls, show only charts
 };
 
 type TokenState = {
@@ -109,6 +110,7 @@ export function useSupersetDashboard(opts: UseSupersetDashboardOpts) {
     user = DEFAULTS.user,
     rls = DEFAULTS.rls,
     backoff = DEFAULTS.backoff,
+    hideControls = false,
     debug = false,
   } = opts;
 
@@ -263,17 +265,27 @@ export function useSupersetDashboard(opts: UseSupersetDashboardOpts) {
         // Prime token so we can fail early if backend is down
         await getToken(false);
 
+        // Build dashboardUiConfig conditionally to hide filters completely
+        const dashboardUiConfig = hideControls
+          ? {
+              hideTitle: true,
+              hideChartControls: true,
+              hideTab: true,
+              filters: { expanded: false },
+            }
+          : {
+              hideTitle: false,
+              hideChartControls: false,
+              hideTab: false,
+              filters: { expanded: true },
+            };
+
         const embedded = (await embedDashboard({
           id: dashboardId,
           supersetDomain: supersetUrl, // must equal token 'aud'
           mountPoint: ref.current,
           fetchGuestToken: sdkFetchGuestToken,
-          dashboardUiConfig: {
-            hideTitle: false,
-            hideChartControls: false,
-            hideTab: false,
-            filters: { expanded: true },
-          },
+          dashboardUiConfig,
           // debug,
         })) as unknown;
 

@@ -1,0 +1,42 @@
+.one-chart-dashboards-page {
+  width: 100%;
+  min-height: 100vh;
+  padding: 20px;
+  box-sizing: border-box;
+}
+
+.one-chart-dashboards-page__container {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  max-width: 1800px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.one-chart-dashboards-page__dashboard-block {
+  width: 100%;
+  height: 600px;
+  overflow: hidden;
+  border: 1px solid #e0e0e0;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  background-color: #fff;
+}
+
+.one-chart-dashboards-page__dashboard-block .superset-viewport {
+  height: 100% !important;
+}
+
+/* Responsive layout for smaller screens */
+@media (max-width: 1200px) {
+  .one-chart-dashboards-page__container {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .one-chart-dashboards-page__dashboard-block {
+    height: 500px;
+  }
+}
+

@@ -7,16 +7,19 @@ function SupersetDashboard({
   backendUrl = 'http://localhost:3001',
   // if you have an app header, pass its height in px
   offsetTop = 0,
+  hideControls = false,
 }: {
   dashboardId: string;
   supersetUrl?: string;
   backendUrl?: string;
   offsetTop?: number; // e.g. 64 for a header
+  hideControls?: boolean; // Hide all controls, show only charts
 }) {
   const { ref, loading, error /*, reload*/ } = useSupersetDashboard({
     dashboardId,
     supersetUrl,
     backendUrl,
+    hideControls,
   });
   const [showLoading, setShowLoading] = useState(true);
 
