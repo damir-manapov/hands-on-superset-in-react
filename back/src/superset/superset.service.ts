@@ -340,4 +340,76 @@ export class SupersetService {
       throw err;
     }
   }
+
+  /**
+   * Get the embed UUID for a dashboard by slug
+   */
+  async getDashboardEmbedUuid(dashboardSlug: string): Promise<string> {
+    // Ensure we're authenticated
+    await this.authenticate();
+
+    try {
+      // Get dashboard by slug
+      const dashboardsResponse = await this.axiosInstance.get(
+        `${this.supersetUrl}/api/v1/dashboard/`,
+        {
+          params: {
+            q: JSON.stringify({
+              filters: [
+                {
+                  col: 'slug',
+                  opr: 'eq',
+                  value: dashboardSlug,
+                },
+              ],
+            }),
+          },
+        }
+      );
+
+      const dashboards = dashboardsResponse.data?.result || [];
+      if (dashboards.length === 0) {
+        throw new HttpException(
+          `Dashboard not found: ${dashboardSlug}`,
+          HttpStatus.NOT_FOUND
+        );
+      }
+
+      const dashboard = dashboards[0];
+      const dashboardId = dashboard.id;
+
+      // Get embedded dashboard info
+      const embeddedResponse = await this.axiosInstance.get(
+        `${this.supersetUrl}/api/v1/dashboard/${dashboardId}/embedded`
+      );
+
+      const embeddedUuid = embeddedResponse.data?.result?.uuid;
+      if (!embeddedUuid) {
+        throw new HttpException(
+          `Embedding not enabled for dashboard: ${dashboardSlug}`,
+          HttpStatus.NOT_FOUND
+        );
+      }
+
+      return embeddedUuid;
+    } catch (err) {
+      if (axios.isAxiosError(err)) {
+        const errorMessage =
+          err.response?.data?.message ||
+          err.message ||
+          'Failed to get dashboard embed UUID';
+
+        this.logger.error('[get_dashboard_embed_uuid] failed', {
+          status: err.response?.status,
+          statusText: err.response?.statusText,
+          data: err.response?.data,
+        });
+        throw new HttpException(
+          errorMessage,
+          err.response?.status ?? HttpStatus.INTERNAL_SERVER_ERROR
+        );
+      }
+      throw err;
+    }
+  }
 }

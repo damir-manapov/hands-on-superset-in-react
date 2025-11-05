@@ -1,10 +1,38 @@
+import { useEffect, useState } from 'react';
 import SupersetDashboard from '../components/SupersetDashboard';
 import './RestrictedDashboardPage.css';
 
+const BACKEND_URL = 'http://localhost:3001';
+const DASHBOARD_SLUG = 'iceberg-demo-dashboard';
+
 function RestrictedDashboardPage() {
-  // Dashboard UUID - use UUID instead of numeric ID for embedded SDK
-  // Get this from Superset UI: Dashboard > Settings > Embedded Dashboard
-  const dashboardId = '535afce7-d1d2-4774-9707-d7bc3929c8e0';
+  const [dashboardId, setDashboardId] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    async function fetchDashboardUuid() {
+      try {
+        const response = await fetch(
+          `${BACKEND_URL}/api/superset/dashboard-embed-uuid?slug=${encodeURIComponent(DASHBOARD_SLUG)}`
+        );
+        if (!response.ok) {
+          throw new Error(`Failed to fetch dashboard UUID: ${response.statusText}`);
+        }
+        const data = await response.json();
+        setDashboardId(data.uuid);
+      } catch (err) {
+        const errorMessage =
+          err instanceof Error ? err.message : 'Failed to load dashboard UUID';
+        setError(errorMessage);
+        console.error('[RestrictedDashboardPage] Error fetching dashboard UUID:', err);
+      } finally {
+        setLoading(false);
+      }
+    }
+
+    void fetchDashboardUuid();
+  }, []);
 
   return (
     <div className="restricted-dashboard-page">
@@ -25,7 +53,19 @@ function RestrictedDashboardPage() {
           </div>
         </div>
         <div className="restricted-dashboard-page__dashboard">
-          <SupersetDashboard dashboardId={dashboardId} />
+          {loading && (
+            <div style={{ padding: '20px', textAlign: 'center' }}>
+              Loading dashboard...
+            </div>
+          )}
+          {error && (
+            <div style={{ padding: '20px', textAlign: 'center', color: 'red' }}>
+              {error}
+            </div>
+          )}
+          {dashboardId && !loading && !error && (
+            <SupersetDashboard dashboardId={dashboardId} />
+          )}
         </div>
         <div className="restricted-dashboard-page__sidebar restricted-dashboard-page__sidebar--right">
           <h2>Right Sidebar</h2>

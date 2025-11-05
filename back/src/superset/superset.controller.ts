@@ -1,7 +1,9 @@
 import {
   Controller,
   Post,
+  Get,
   Body,
+  Query,
   HttpCode,
   HttpStatus,
   BadRequestException,
@@ -65,6 +67,27 @@ export class SupersetController {
         error instanceof Error
           ? error.message
           : 'Failed to generate guest token';
+      throw new Error(message);
+    }
+  }
+
+  @Get('dashboard-embed-uuid')
+  async getDashboardEmbedUuid(
+    @Query('slug') slug?: string
+  ): Promise<{ uuid: string }> {
+    const dashboardSlug =
+      slug || process.env.DEFAULT_DASHBOARD_SLUG || 'iceberg-demo-dashboard';
+
+    try {
+      const uuid = await this.supersetService.getDashboardEmbedUuid(
+        dashboardSlug
+      );
+      return { uuid };
+    } catch (error) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to get dashboard embed UUID';
       throw new Error(message);
     }
   }
