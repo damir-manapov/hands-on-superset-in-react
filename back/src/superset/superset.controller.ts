@@ -56,7 +56,7 @@ export class SupersetController {
 
     try {
       return await this.supersetService.generateGuestToken(
-      dto.resources,
+        dto.resources,
         dto.user,
         dto.rls
       );

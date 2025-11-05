@@ -1,0 +1,264 @@
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { embedDashboard } from '@superset-ui/embedded-sdk';
+
+type BackoffOpts = { tries?: number; baseMs?: number; maxMs?: number };
+
+type UseSupersetDashboardOpts = {
+  dashboardId: string; // Embedded Dashboard UUID
+  supersetUrl?: string; // must match token 'aud' (your Superset origin)
+  backendUrl?: string; // your backend origin that mints guest tokens
+  user?: { username: string; first_name?: string; last_name?: string };
+  rls?: Array<{ clause: string }>;
+  backoff?: BackoffOpts; // optional override
+  debug?: boolean;
+};
+
+type TokenState = {
+  token: string | null;
+  expMs: number; // ms timestamp
+};
+
+const DEFAULTS = {
+  supersetUrl: 'http://localhost:8088',
+  backendUrl: 'http://localhost:3001',
+  user: { username: 'guest', first_name: 'Guest', last_name: 'User' },
+  rls: [] as Array<{ clause: string }>,
+  backoff: { tries: 4, baseMs: 300, maxMs: 5000 } as BackoffOpts,
+  refreshSkewMs: 60_000, // refresh 60s before expiry
+};
+
+function base64UrlDecode(s: string) {
+  // convert base64url -> base64 and decode
+  s = s.replace(/-/g, '+').replace(/_/g, '/');
+  const pad = s.length % 4 ? 4 - (s.length % 4) : 0;
+  return atob(s + '='.repeat(pad));
+}
+
+function decodeJwtExpMs(token: string): number | null {
+  try {
+    const [, payload] = token.split('.');
+    const json = JSON.parse(base64UrlDecode(payload));
+    // exp is seconds since epoch
+    return typeof json.exp === 'number' ? json.exp * 1000 : null;
+  } catch {
+    return null;
+  }
+}
+
+async function sleep(ms: number) {
+  await new Promise(r => setTimeout(r, ms));
+}
+
+async function fetchWithRetry<T>(
+  fn: () => Promise<T>,
+  { tries = 4, baseMs = 300, maxMs = 5000 }: BackoffOpts
+): Promise<T> {
+  let attempt = 0;
+  let lastErr: unknown;
+  while (attempt < tries) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      lastErr = e;
+      // retry only on transient errors (network/5xx)
+      const status = e?.response?.status;
+      const transient = !status || (status >= 500 && status < 600);
+      if (!transient) break;
+      const backoff = Math.min(maxMs, baseMs * Math.pow(2, attempt));
+      await sleep(backoff);
+    }
+    attempt++;
+  }
+  throw lastErr;
+}
+
+function toDestroyFn(obj: unknown): () => void {
+  if (typeof obj === 'function') return obj as () => void; // ← cast, not Function
+  if (obj && typeof obj === 'object') {
+    const anyObj = obj as any;
+    if (typeof anyObj.destroy === 'function') return () => anyObj.destroy();
+    if (typeof anyObj.unmount === 'function') return () => anyObj.unmount();
+  }
+  return () => {};
+}
+
+/**
+ * useSupersetDashboard
+ * Embeds a Superset dashboard and auto-refreshes the guest token before expiry.
+ */
+export function useSupersetDashboard(opts: UseSupersetDashboardOpts) {
+  const {
+    dashboardId,
+    supersetUrl = DEFAULTS.supersetUrl,
+    backendUrl = DEFAULTS.backendUrl,
+    user = DEFAULTS.user,
+    rls = DEFAULTS.rls,
+    backoff = DEFAULTS.backoff,
+    debug = false,
+  } = opts;
+
+  const ref = useRef<HTMLDivElement | null>(null);
+  const destroyRef = useRef<() => void>(() => {});
+  const refreshTimer = useRef<number | null>(null);
+  const tokenState = useRef<TokenState>({ token: null, expMs: 0 });
+
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  // clears token refresh timer
+  const clearRefreshTimer = useCallback(() => {
+    if (refreshTimer.current) {
+      window.clearTimeout(refreshTimer.current);
+      refreshTimer.current = null;
+    }
+  }, []);
+
+  // schedule refresh before token expiry
+  const scheduleRefresh = useCallback(
+    (expMs: number) => {
+      clearRefreshTimer();
+      const now = Date.now();
+      const skew = DEFAULTS.refreshSkewMs;
+      const delay = Math.max(1000, expMs - skew - now);
+      refreshTimer.current = window.setTimeout(async () => {
+        try {
+          if (debug) console.log('[useSupersetDashboard] refreshing token…');
+          // Force getToken(true) to fetch new token immediately
+          await getToken(true);
+        } catch (e: any) {
+          if (debug)
+            console.warn(
+              '[useSupersetDashboard] token refresh failed:',
+              e?.message || e
+            );
+          // Let SDK call fetchGuestToken again on demand; we’ll retry then.
+        }
+      }, delay);
+      if (debug)
+        console.log(
+          '[useSupersetDashboard] scheduled token refresh in',
+          delay,
+          'ms'
+        );
+    },
+    [clearRefreshTimer, debug]
+  );
+
+  // fetch token from backend; caches and schedules refresh
+  const getToken = useCallback(
+    async (force = false): Promise<string> => {
+      const now = Date.now();
+      const cached = tokenState.current;
+      if (
+        !force &&
+        cached.token &&
+        now < cached.expMs - DEFAULTS.refreshSkewMs
+      ) {
+        return cached.token;
+      }
+
+      const request = async () => {
+        const res = await fetch(`${backendUrl}/api/superset/guest-token`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include', // harmless if backend doesn't use cookies
+          body: JSON.stringify({
+            resources: [{ type: 'dashboard', id: dashboardId }],
+            user,
+            rls,
+          }),
+        });
+        if (!res.ok) {
+          const text = await res.text().catch(() => '');
+          throw new Error(
+            `guest-token ${res.status} ${res.statusText} ${text}`
+          );
+        }
+        const data = (await res.json()) as { token: string };
+        const expMs = decodeJwtExpMs(data.token) ?? now + 5 * 60 * 1000; // fallback 5m
+        tokenState.current = { token: data.token, expMs };
+        scheduleRefresh(expMs);
+        return data.token;
+      };
+
+      return fetchWithRetry(request, backoff);
+    },
+    [backendUrl, dashboardId, backoff, rls, scheduleRefresh, user]
+  );
+
+  // fetchGuestToken for SDK (uses our cache/refresh logic)
+  const sdkFetchGuestToken = useMemo(() => {
+    return async () => {
+      const t = await getToken(false);
+      if (debug)
+        console.log(
+          '[useSupersetDashboard] sdkFetchGuestToken -> token len',
+          t.length
+        );
+      return t;
+    };
+  }, [getToken, debug]);
+
+  const reload = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    destroyRef.current();
+    tokenState.current = { token: null, expMs: 0 };
+    clearRefreshTimer();
+    // will be re-embedded by effect below
+  }, [clearRefreshTimer]);
+
+  // (re)embed when inputs change
+  useEffect(() => {
+    let cancelled = false;
+
+    async function run() {
+      if (!ref.current) return;
+      setLoading(true);
+      setError(null);
+
+      // cleanup previous instance if any
+      destroyRef.current();
+      destroyRef.current = () => {};
+
+      try {
+        // Prime token so we can fail early if backend is down
+        await getToken(false);
+
+        const embedded = await embedDashboard({
+          id: dashboardId,
+          supersetDomain: supersetUrl, // must equal token 'aud'
+          mountPoint: ref.current,
+          fetchGuestToken: sdkFetchGuestToken,
+          dashboardUiConfig: {
+            hideTitle: false,
+            hideChartControls: false,
+            hideTab: false,
+            filters: { expanded: true },
+          },
+          // debug,
+        });
+
+        if (!cancelled) {
+          destroyRef.current = toDestroyFn(embedded);
+          setLoading(false);
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e?.message ?? 'Failed to load dashboard');
+          setLoading(false);
+        }
+      }
+    }
+
+    void run();
+    return () => {
+      cancelled = true;
+      destroyRef.current();
+      clearRefreshTimer();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dashboardId, supersetUrl, backendUrl, sdkFetchGuestToken]);
+
+  return { ref, loading, error, reload };
+}
