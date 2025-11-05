@@ -12,7 +12,7 @@ import { SupersetService } from './superset.service';
 
 interface GenerateGuestTokenDto {
   resources: Array<{
-    type: 'dashboard' | 'chart';
+    type: 'dashboard';
     id: string;
   }>;
   user?: {
@@ -46,9 +46,9 @@ export class SupersetController {
 
     // Validate resource types
     for (const resource of dto.resources) {
-      if (!resource.type || !['dashboard', 'chart'].includes(resource.type)) {
+      if (!resource.type || resource.type !== 'dashboard') {
         throw new BadRequestException(
-          `Invalid resource type: ${resource.type}. Must be 'dashboard' or 'chart'`
+          `Invalid resource type: ${resource.type}. Must be 'dashboard'`
         );
       }
       if (!resource.id) {

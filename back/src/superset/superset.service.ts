@@ -10,7 +10,7 @@ interface GuestTokenRequest {
     last_name?: string;
   };
   resources: Array<{
-    type: 'dashboard' | 'chart';
+    type: 'dashboard';
     id: string;
   }>;
   rls: Array<{
@@ -268,10 +268,10 @@ export class SupersetService {
   }
 
   /**
-   * Generate a guest token for embedding Superset dashboards/charts
+   * Generate a guest token for embedding Superset dashboards
    */
   async generateGuestToken(
-    resources: Array<{ type: 'dashboard' | 'chart'; id: string }>,
+    resources: Array<{ type: 'dashboard'; id: string }>,
     user?: { username: string; first_name?: string; last_name?: string },
     rls: Array<{ clause: string }> = []
   ): Promise<{ token: string }> {
