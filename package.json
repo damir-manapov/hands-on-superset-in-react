@@ -12,7 +12,11 @@
     "lint": "pnpm -r lint",
     "lint:fix": "pnpm -r lint:fix",
     "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,scss,md}\"",
-    "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,scss,md}\""
+    "format:check": "prettier --check \"**/*.{js,jsx,ts,tsx,json,css,scss,md}\"",
+    "compose:down": "docker compose -f compose/compose.yaml down",
+    "compose:up": "docker compose -f compose/compose.yaml up -d starter",
+    "compose:restart": "docker compose -f compose/compose.yaml restart",
+    "compose:reset": "docker compose -f compose/compose.yaml down -v --remove-orphans"
   },
   "devDependencies": {
     "@typescript-eslint/eslint-plugin": "^8.46.3",
