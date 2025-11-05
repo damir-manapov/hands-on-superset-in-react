@@ -1,10 +1,10 @@
-import { CSSProperties, ReactNode } from "react";
-import { useSupersetDashboard } from "../hooks/useSupersetDashboard";
+import { CSSProperties, ReactNode } from 'react';
+import { useSupersetDashboard } from '../hooks/useSupersetDashboard';
 
 function SupersetDashboard({
   dashboardId,
-  supersetUrl = "http://localhost:8088",
-  backendUrl = "http://localhost:3001",
+  supersetUrl = 'http://localhost:8088',
+  backendUrl = 'http://localhost:3001',
   // if you have an app header, pass its height in px
   offsetTop = 0,
 }: {
@@ -23,14 +23,18 @@ function SupersetDashboard({
     <div
       className="superset-viewport"
       style={{
-        position: "relative",
-        width: "100%",
+        position: 'relative',
+        width: '100%',
         height: `calc(100vh - ${offsetTop}px)`, // full screen minus header if any
       }}
     >
-      <div ref={ref} className="superset-mount" style={{ width: "100%", height: "100%" }} />
+      <div
+        ref={ref}
+        className="superset-mount"
+        style={{ width: '100%', height: '100%' }}
+      />
       {loading && <Overlay>Loading…</Overlay>}
-      {error && <Overlay style={{ color: "red" }}>Error: {error}</Overlay>}
+      {error && <Overlay style={{ color: 'red' }}>Error: {error}</Overlay>}
     </div>
   );
 }
@@ -44,12 +48,12 @@ function Overlay({ children, style }: OverlayProps) {
   return (
     <div
       style={{
-        position: "absolute",
+        position: 'absolute',
         inset: 0,
-        backgroundColor: "rgba(255,255,255,0.9)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
+        backgroundColor: 'rgba(255,255,255,0.9)',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
         zIndex: 10,
         ...(style ?? {}),
       }}
