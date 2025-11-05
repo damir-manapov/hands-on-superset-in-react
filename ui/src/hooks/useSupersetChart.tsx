@@ -34,7 +34,7 @@ export function useSupersetChart(opts: UseSupersetChartOpts) {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          resources: [{ type: 'dashboard', id: chartId }],
+          resources: [{ type: 'chart', id: chartId }],
           rls: [],
         }),
       });

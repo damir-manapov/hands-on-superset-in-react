@@ -209,7 +209,9 @@ def ensure_dashboard(charts):
     """Create a dashboard with all charts"""
     from superset import db
     from superset.models.dashboard import Dashboard
+    from superset.models.embedded_dashboard import EmbeddedDashboard
     import json
+    import uuid
     
     if not charts:
         print("[init] No charts available for dashboard creation")
@@ -223,6 +225,61 @@ def ensure_dashboard(charts):
         
         if existing:
             print(f"[init] Dashboard exists: {existing.dashboard_title}")
+            
+            # Enable embedding by ensuring UUID exists and is committed
+            uuid_updated = False
+            if not existing.uuid:
+                existing.uuid = str(uuid.uuid4())
+                uuid_updated = True
+                print(f"[init] Generated UUID for dashboard embedding: {existing.uuid}")
+            
+            # Ensure dashboard is published (required for embedding)
+            if not existing.published:
+                existing.published = True
+                uuid_updated = True
+                print(f"[init] Published dashboard for embedding")
+            
+            # Enable embedding by creating/updating EmbeddedDashboard entry
+            # This is what Superset uses to track embedded dashboards
+            try:
+                # Allowed domains for embedding - must be comma-separated string, not JSON
+                allowed_domains = [
+                    "http://localhost:3000",
+                    "http://127.0.0.1:3000",
+                ]
+                allowed_domains_str = ",".join(allowed_domains)
+                
+                embedded_dash = db.session.query(EmbeddedDashboard).filter_by(
+                    dashboard_id=existing.id
+                ).first()
+                
+                if not embedded_dash:
+                    # Create new embedded dashboard entry
+                    # allow_domain_list must be comma-separated string, not JSON
+                    embedded_dash = EmbeddedDashboard(
+                        dashboard_id=existing.id,
+                        uuid=existing.uuid,
+                        allow_domain_list=allowed_domains_str
+                    )
+                    db.session.add(embedded_dash)
+                    uuid_updated = True
+                    print(f"[init] Created EmbeddedDashboard entry for embedding with allowed domains: {allowed_domains_str}")
+                elif embedded_dash.uuid != existing.uuid:
+                    # Update UUID if it doesn't match
+                    embedded_dash.uuid = existing.uuid
+                    embedded_dash.allow_domain_list = allowed_domains_str
+                    uuid_updated = True
+                    print(f"[init] Updated EmbeddedDashboard UUID and allowed domains: {allowed_domains_str}")
+                else:
+                    # Update allowed domains even if UUID matches
+                    embedded_dash.allow_domain_list = allowed_domains_str
+                    uuid_updated = True
+                    print(f"[init] Updated EmbeddedDashboard allowed domains: {allowed_domains_str}")
+            except Exception as e:
+                print(f"[init] Warning: Could not create/update EmbeddedDashboard: {e}")
+                import traceback
+                traceback.print_exc()
+            
             # Update existing dashboard with all charts
             updated = False
             for chart in charts:
@@ -263,9 +320,21 @@ def ensure_dashboard(charts):
             except Exception as e:
                 print(f"[init] Warning: Could not update dashboard metadata: {e}")
             
-            if updated:
+            # Commit if anything changed (including EmbeddedDashboard creation/update)
+            if updated or uuid_updated:
                 db.session.commit()
                 print(f"[init] Dashboard updated with {len(charts)} charts")
+                if existing.uuid:
+                    print(f"[init] Dashboard UUID for embedding: {existing.uuid}")
+                    print(f"[init] Dashboard is published: {existing.published}")
+                    # Verify EmbeddedDashboard entry exists
+                    embedded_check = db.session.query(EmbeddedDashboard).filter_by(
+                        dashboard_id=existing.id
+                    ).first()
+                    if embedded_check:
+                        print(f"[init] EmbeddedDashboard entry confirmed with UUID: {embedded_check.uuid}")
+                    else:
+                        print(f"[init] WARNING: EmbeddedDashboard entry not found after creation")
             return
         
         # Create dashboard JSON metadata with all charts positioned in a grid
@@ -306,11 +375,15 @@ def ensure_dashboard(charts):
             }
             dashboard_json["GRID_ID"]["children"].append(chart_id)
         
+        # Generate UUID for embedding
+        dashboard_uuid = str(uuid.uuid4())
+        
         dashboard = Dashboard(
             dashboard_title="Iceberg Demo Dashboard",
             slug="iceberg-demo-dashboard",
             json_metadata=json.dumps(dashboard_json),
             published=True,
+            uuid=dashboard_uuid,  # Set UUID for embedding
         )
         db.session.add(dashboard)
         db.session.commit()
@@ -320,7 +393,37 @@ def ensure_dashboard(charts):
             dashboard.slices.append(chart)
         db.session.commit()
         
+        # Create EmbeddedDashboard entry to enable embedding
+        # This is what Superset uses to track embedded dashboards
+        try:
+            # Convert string UUID to UUID object if needed
+            import uuid as uuid_module
+            dashboard_uuid_obj = uuid_module.UUID(dashboard_uuid) if isinstance(dashboard_uuid, str) else dashboard_uuid
+            
+            # Allowed domains for embedding - must be comma-separated string, not JSON
+            allowed_domains = [
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+            ]
+            allowed_domains_str = ",".join(allowed_domains)
+            
+            embedded_dash = EmbeddedDashboard(
+                dashboard_id=dashboard.id,
+                uuid=dashboard_uuid_obj,
+                allow_domain_list=allowed_domains_str
+            )
+            db.session.add(embedded_dash)
+            db.session.commit()
+            print(f"[init] Created EmbeddedDashboard entry for embedding with allowed domains: {allowed_domains_str}")
+        except Exception as e:
+            print(f"[init] Warning: Could not create EmbeddedDashboard entry: {e}")
+            import traceback
+            traceback.print_exc()
+            db.session.rollback()
+        
         print(f"[init] Dashboard created: Iceberg Demo Dashboard with {len(charts)} charts")
+        print(f"[init] Dashboard UUID for embedding: {dashboard_uuid}")
+        print(f"[init] Embedding enabled via EmbeddedDashboard model")
         
     except Exception as e:
         print(f"[init] Warning: Could not create dashboard: {e}")

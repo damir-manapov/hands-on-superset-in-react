@@ -39,6 +39,12 @@ lerna-debug.log*
 # OS
 Thumbs.db
 
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+compose/superset/__pycache__/
+
 # Lock files (optional - some teams prefer to commit these)
 # package-lock.json
 # yarn.lock

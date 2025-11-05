@@ -288,8 +288,17 @@ export class SupersetService {
       )
     );
 
-    const payload: GuestTokenRequest = { resources, rls };
-    if (user) payload.user = user;
+    // Superset requires a user field, so provide a default if none is given
+    const defaultUser = {
+      username: 'guest',
+      first_name: 'Guest',
+      last_name: 'User',
+    };
+    const payload: GuestTokenRequest = {
+      resources,
+      rls,
+      user: user ?? defaultUser,
+    };
 
     try {
       const { data } = await this.axiosInstance.post<GuestTokenResponse>(
