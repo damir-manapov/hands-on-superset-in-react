@@ -54,10 +54,14 @@ export class SupersetController {
       }
     }
 
-    return this.supersetService.generateGuestToken(
+    try {
+      return await this.supersetService.generateGuestToken(
       dto.resources,
-      dto.user,
-      dto.rls
-    );
+        dto.user,
+        dto.rls
+      );
+    } catch (error) {
+      throw new Error(error.message);
+    }
   }
 }

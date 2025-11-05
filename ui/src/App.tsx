@@ -1,23 +1,20 @@
-import Logo from './logo.svg?react';
+import SupersetDashboard from './components/SupersetDashboard';
 import './App.css';
 
 function App() {
+  // Dashboard UUID - use UUID instead of numeric ID for embedded SDK
+  // Get this from Superset UI: Dashboard > Settings > Embedded Dashboard
+  const dashboardId = '3a504031-72ab-4f46-bfb7-277051c5919b';
+
   return (
     <div className="App">
       <header className="App-header">
-        <Logo className="App-logo" />
-        <p>
-          Edit <code>src/App.tsx</code> and save to reload.
-        </p>
-        <a
-          className="App-link"
-          href="https://reactjs.org"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Learn React
-        </a>
+        <h1>Superset Dashboard Embedded in React</h1>
+        <p>This dashboard is embedded using @superset-ui/embedded-sdk</p>
       </header>
+      <main style={{ padding: '20px', width: '100%' }}>
+        <SupersetDashboard dashboardId={dashboardId} />
+      </main>
     </div>
   );
 }

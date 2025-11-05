@@ -59,7 +59,7 @@ async function forgeGuestToken() {
       console.log('⚠️  No resources specified, using default dashboard ID: 1');
       resources.push({
         type: 'dashboard',
-        id: '1',
+        id: '535afce7-d1d2-4774-9707-d7bc3929c8e0',
       });
     }
 

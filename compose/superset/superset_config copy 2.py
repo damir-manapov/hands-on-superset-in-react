@@ -23,6 +23,3 @@ TALISMAN_CONFIG = {
     "frame_options": None,
     "force_https": False,  # dev only; set True in prod behind TLS
 }
-
-SESSION_COOKIE_SECURE = False
-SESSION_COOKIE_DOMAIN = None  # force host-only cookie (works best with localhost)
