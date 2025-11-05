@@ -11,6 +11,11 @@ if ! $PYTHON -c 'import sqlalchemy_trino, trino' >/dev/null 2>&1; then
     sqlalchemy-trino
 fi
 
+# Ensure flask-cors is available for CORS support
+if ! $PYTHON -c 'import flask_cors' >/dev/null 2>&1; then
+  pip install --no-cache-dir flask-cors
+fi
+
 superset fab create-admin \
   --username "${ADMIN_USERNAME:-admin}" \
   --firstname "${ADMIN_FIRST_NAME:-Admin}" \
