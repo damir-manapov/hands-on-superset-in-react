@@ -25,7 +25,7 @@ function SupersetDashboard({
       style={{
         position: 'relative',
         width: '100%',
-        height: '100vh',
+        height: offsetTop > 0 ? `calc(100vh - ${offsetTop}px)` : '100%',
       }}
     >
       <div
@@ -50,15 +50,17 @@ function Overlay({ children, style }: OverlayProps) {
       style={{
         position: 'absolute',
         inset: 0,
-        backgroundColor: 'rgba(255,255,255,0.9)',
+        backgroundColor: 'rgba(255,255,255,0.7)', // More transparent so content can be seen
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 10,
+        pointerEvents: 'none', // Allow interaction with content below
+        transition: 'opacity 0.3s ease-out', // Fade out smoothly
         ...(style ?? {}),
       }}
     >
-      <p>{children}</p>
+      <p style={{ margin: 0 }}>{children}</p>
     </div>
   );
 }

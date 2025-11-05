@@ -18,9 +18,37 @@
 }
 
 .App-header p {
-  margin: 0;
+  margin: 0 0 15px 0;
   font-size: 1rem;
   opacity: 0.9;
+}
+
+.App-nav {
+  display: flex;
+  gap: 10px;
+  justify-content: center;
+  margin-top: 15px;
+}
+
+.App-nav a {
+  padding: 10px 20px;
+  background-color: #444;
+  color: white;
+  border: 1px solid #666;
+  border-radius: 4px;
+  text-decoration: none;
+  font-size: 1rem;
+  transition: background-color 0.2s;
+}
+
+.App-nav a:hover {
+  background-color: #555;
+}
+
+.App-nav a.active {
+  background-color: #61dafb;
+  color: #282c34;
+  border-color: #61dafb;
 }
 
 main {

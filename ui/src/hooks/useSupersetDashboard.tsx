@@ -274,58 +274,10 @@ export function useSupersetDashboard(opts: UseSupersetDashboardOpts) {
         if (!cancelled) {
           destroyRef.current = toDestroyFn(embedded);
 
-          // Hide loading overlay once the iframe is created so users can see content as it loads
-          // The SDK creates the iframe, and then the dashboard content loads inside it
-          // We'll hide loading as soon as the iframe exists, not waiting for full load
-          let loadingCleared = false;
-          const clearLoading = () => {
-            if (!cancelled && !loadingCleared) {
-              loadingCleared = true;
-              setLoading(false);
-            }
-          };
-
-          const checkIframe = () => {
-            const iframe = ref.current?.querySelector('iframe');
-            if (iframe) {
-              // Iframe exists - hide loading overlay immediately so users can see content loading
-              clearLoading();
-            } else {
-              // No iframe found yet, wait a bit and check again (max 10 attempts = 1 second)
-              let attempts = 0;
-              const maxAttempts = 10;
-              const checkInterval = 100;
-
-              const retryCheck = () => {
-                attempts++;
-                const iframe = ref.current?.querySelector('iframe');
-                if (iframe) {
-                  clearLoading();
-                } else if (
-                  attempts < maxAttempts &&
-                  !cancelled &&
-                  !loadingCleared
-                ) {
-                  setTimeout(() => {
-                    if (!cancelled && !loadingCleared) {
-                      retryCheck();
-                    }
-                  }, checkInterval);
-                } else {
-                  // Iframe not found after retries, clear loading anyway
-                  clearLoading();
-                }
-              };
-              retryCheck();
-            }
-          };
-
-          // Start checking after a short delay to let the SDK create the iframe
-          setTimeout(() => {
-            if (!cancelled && !loadingCleared) {
-              checkIframe();
-            }
-          }, 100);
+          // Hide loading overlay immediately after embedDashboard returns
+          // The SDK creates the iframe synchronously, so we can clear loading right away
+          // This allows users to see content as it progressively loads inside the iframe
+          setLoading(false);
         }
       } catch (e: unknown) {
         if (!cancelled) {
