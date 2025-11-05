@@ -12,7 +12,7 @@ function App() {
         <h1>Superset Dashboard Embedded in React</h1>
         <p>This dashboard is embedded using @superset-ui/embedded-sdk</p>
       </header>
-      <main style={{ padding: '20px', width: '100%' }}>
+      <main style={{ width: '100%', boxSizing: 'border-box' }}>
         <SupersetDashboard dashboardId={dashboardId} />
       </main>
     </div>

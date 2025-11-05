@@ -1,6 +1,8 @@
 .App {
   width: 100%;
   min-height: 100vh;
+  overflow-x: hidden; /* Prevent horizontal overflow */
+  max-width: 100vw; /* Ensure it doesn't exceed viewport width */
 }
 
 .App-header {
@@ -24,14 +26,23 @@
 main {
   width: 100%;
   max-width: 100%;
-  overflow-x: auto;
+  overflow-x: hidden; /* Prevent horizontal scroll */
+  box-sizing: border-box; /* Include padding in width calculation */
 }
 
 /* remove iframe chrome look */
+.superset-viewport {
+  box-sizing: border-box;
+  max-width: 100%;
+  overflow: hidden; /* Prevent iframe from causing overflow */
+}
+
 .superset-viewport iframe {
   border: 0 !important;
   box-shadow: none !important;
   display: block;
   width: 100%;
   height: 100%;
+  max-width: 100%; /* Ensure iframe doesn't exceed container */
+  box-sizing: border-box;
 }
