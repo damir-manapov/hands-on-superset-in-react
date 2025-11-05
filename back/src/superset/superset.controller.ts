@@ -61,7 +61,11 @@ export class SupersetController {
         dto.rls
       );
     } catch (error) {
-      throw new Error(error.message);
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Failed to generate guest token';
+      throw new Error(message);
     }
   }
 }

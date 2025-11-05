@@ -1,5 +1,5 @@
 import { Injectable, HttpException, HttpStatus, Logger } from '@nestjs/common';
-import axios, { AxiosInstance, AxiosError } from 'axios';
+import axios, { AxiosInstance } from 'axios';
 import { wrapper } from 'axios-cookiejar-support';
 import { CookieJar } from 'tough-cookie';
 
@@ -21,6 +21,7 @@ interface GuestTokenRequest {
 interface LoginResponse {
   access_token: string;
   refresh_token?: string;
+  expires_in?: number;
 }
 
 interface GuestTokenResponse {
@@ -28,7 +29,9 @@ interface GuestTokenResponse {
 }
 
 interface CsrfTokenResponse {
-  result: string;
+  result?: string;
+  csrf_token?: string;
+  token?: string;
 }
 
 @Injectable()
@@ -125,9 +128,8 @@ export class SupersetService {
         }
       );
 
-      const data = resp.data as any;
-      const token: string =
-        data?.result ?? data?.csrf_token ?? data?.token ?? '';
+      const data: CsrfTokenResponse = resp.data;
+      const token: string = data.result ?? data.csrf_token ?? data.token ?? '';
 
       if (!token) {
         throw new HttpException(
@@ -137,9 +139,12 @@ export class SupersetService {
       }
 
       // --- Capture Set-Cookie header(s) from Superset
-      const setCookieHdr = (resp.headers as any)['set-cookie'] as
-        | string[]
-        | undefined;
+      const setCookieHeader = resp.headers['set-cookie'];
+      const setCookieHdr: string[] | undefined = Array.isArray(setCookieHeader)
+        ? setCookieHeader
+        : typeof setCookieHeader === 'string'
+          ? [setCookieHeader]
+          : undefined;
       if (setCookieHdr?.length) {
         // Try to find the Flask session cookie value
         const sessionPair = setCookieHdr
@@ -210,17 +215,19 @@ export class SupersetService {
       return token;
     } catch (err) {
       if (axios.isAxiosError(err)) {
+        const errorResponseData: unknown = err.response?.data;
+        const errorHeaders: unknown = err.response?.headers;
         this.logger.error('[SupersetService] getCsrfToken() failed', {
           status: err.response?.status,
-          data: err.response?.data,
-          headers: err.response?.headers,
+          data: errorResponseData,
+          headers: errorHeaders,
         });
         throw new HttpException(
           'Failed to get CSRF token from Superset',
           err.response?.status ?? HttpStatus.BAD_GATEWAY
         );
       }
-      throw err;
+      throw err instanceof Error ? err : new Error(String(err));
     }
   }
 
@@ -251,13 +258,13 @@ export class SupersetService {
     );
 
     this.accessToken = data.access_token;
-    const ttlSec = (data as any)?.expires_in ?? 300;
+    const ttlSec = data.expires_in ?? 300;
     this.accessExp = now + ttlSec * 1000;
 
     this.axiosInstance.defaults.headers.common['Authorization'] =
       `Bearer ${this.accessToken}`;
 
-    return this.accessToken!;
+    return this.accessToken;
   }
 
   /**
@@ -301,18 +308,25 @@ export class SupersetService {
       return { token: data.token };
     } catch (err) {
       if (axios.isAxiosError(err)) {
+        const errorData = err.response?.data as
+          | { message?: string }
+          | string
+          | undefined;
+        const errorMessage =
+          typeof errorData === 'object' && errorData !== null
+            ? (errorData.message ?? JSON.stringify(errorData))
+            : typeof errorData === 'string'
+              ? errorData
+              : JSON.stringify(errorData ?? 'guest_token failed');
+
+        const errorResponseData: unknown = err.response?.data;
         this.logger.error('[guest_token] failed', {
           status: err.response?.status,
           statusText: err.response?.statusText,
-          data: err.response?.data, // <-- this has the real reason
+          data: errorResponseData, // <-- this has the real reason
           requestBody: payload, // help spot shape problems
         });
-        throw new HttpException(
-          err.response?.data?.message ||
-            JSON.stringify(err.response?.data) ||
-            'guest_token failed',
-          err.response?.status ?? 400
-        );
+        throw new HttpException(errorMessage, err.response?.status ?? 400);
       }
       throw err;
     }

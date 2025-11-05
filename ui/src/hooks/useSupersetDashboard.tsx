@@ -37,7 +37,7 @@ function base64UrlDecode(s: string) {
 function decodeJwtExpMs(token: string): number | null {
   try {
     const [, payload] = token.split('.');
-    const json = JSON.parse(base64UrlDecode(payload));
+    const json = JSON.parse(base64UrlDecode(payload)) as { exp?: number };
     // exp is seconds since epoch
     return typeof json.exp === 'number' ? json.exp * 1000 : null;
   } catch {
@@ -58,10 +58,19 @@ async function fetchWithRetry<T>(
   while (attempt < tries) {
     try {
       return await fn();
-    } catch (e: any) {
+    } catch (e: unknown) {
       lastErr = e;
       // retry only on transient errors (network/5xx)
-      const status = e?.response?.status;
+      const status =
+        typeof e === 'object' &&
+        e !== null &&
+        'response' in e &&
+        typeof e.response === 'object' &&
+        e.response !== null &&
+        'status' in e.response &&
+        typeof e.response.status === 'number'
+          ? e.response.status
+          : undefined;
       const transient = !status || (status >= 500 && status < 600);
       if (!transient) break;
       const backoff = Math.min(maxMs, baseMs * Math.pow(2, attempt));
@@ -75,9 +84,15 @@ async function fetchWithRetry<T>(
 function toDestroyFn(obj: unknown): () => void {
   if (typeof obj === 'function') return obj as () => void; // ← cast, not Function
   if (obj && typeof obj === 'object') {
-    const anyObj = obj as any;
-    if (typeof anyObj.destroy === 'function') return () => anyObj.destroy();
-    if (typeof anyObj.unmount === 'function') return () => anyObj.unmount();
+    const objRecord = obj as Record<string, unknown>;
+    if (typeof objRecord.destroy === 'function') {
+      const destroyFn = objRecord.destroy as () => void;
+      return () => destroyFn();
+    }
+    if (typeof objRecord.unmount === 'function') {
+      const unmountFn = objRecord.unmount as () => void;
+      return () => unmountFn();
+    }
   }
   return () => {};
 }
@@ -113,37 +128,6 @@ export function useSupersetDashboard(opts: UseSupersetDashboardOpts) {
     }
   }, []);
 
-  // schedule refresh before token expiry
-  const scheduleRefresh = useCallback(
-    (expMs: number) => {
-      clearRefreshTimer();
-      const now = Date.now();
-      const skew = DEFAULTS.refreshSkewMs;
-      const delay = Math.max(1000, expMs - skew - now);
-      refreshTimer.current = window.setTimeout(async () => {
-        try {
-          if (debug) console.log('[useSupersetDashboard] refreshing token…');
-          // Force getToken(true) to fetch new token immediately
-          await getToken(true);
-        } catch (e: any) {
-          if (debug)
-            console.warn(
-              '[useSupersetDashboard] token refresh failed:',
-              e?.message || e
-            );
-          // Let SDK call fetchGuestToken again on demand; we’ll retry then.
-        }
-      }, delay);
-      if (debug)
-        console.log(
-          '[useSupersetDashboard] scheduled token refresh in',
-          delay,
-          'ms'
-        );
-    },
-    [clearRefreshTimer, debug]
-  );
-
   // fetch token from backend; caches and schedules refresh
   const getToken = useCallback(
     async (force = false): Promise<string> => {
@@ -177,18 +161,66 @@ export function useSupersetDashboard(opts: UseSupersetDashboardOpts) {
         const data = (await res.json()) as { token: string };
         const expMs = decodeJwtExpMs(data.token) ?? now + 5 * 60 * 1000; // fallback 5m
         tokenState.current = { token: data.token, expMs };
-        scheduleRefresh(expMs);
+        // Schedule refresh before token expiry
+        clearRefreshTimer();
+        const skew = DEFAULTS.refreshSkewMs;
+        const delay = Math.max(1000, expMs - skew - now);
+        refreshTimer.current = window.setTimeout(() => {
+          void (async () => {
+            try {
+              if (debug)
+                console.log('[useSupersetDashboard] refreshing token…');
+              // Force getToken(true) to fetch new token immediately
+              await getToken(true);
+            } catch (e: unknown) {
+              if (debug) {
+                let errorMessage: string;
+                if (e instanceof Error) {
+                  errorMessage = e.message;
+                } else if (
+                  e !== null &&
+                  e !== undefined &&
+                  (typeof e === 'string' ||
+                    typeof e === 'number' ||
+                    typeof e === 'boolean')
+                ) {
+                  errorMessage = String(e);
+                } else if (
+                  typeof e === 'object' &&
+                  e !== null &&
+                  'message' in e &&
+                  typeof e.message === 'string'
+                ) {
+                  errorMessage = e.message;
+                } else {
+                  errorMessage = 'unknown error';
+                }
+                console.warn(
+                  '[useSupersetDashboard] token refresh failed:',
+                  errorMessage
+                );
+              }
+              // Let SDK call fetchGuestToken again on demand; we'll retry then.
+            }
+          })();
+        }, delay);
+        if (debug)
+          console.log(
+            '[useSupersetDashboard] scheduled token refresh in',
+            delay,
+            'ms'
+          );
         return data.token;
       };
 
       return fetchWithRetry(request, backoff);
     },
-    [backendUrl, dashboardId, backoff, rls, scheduleRefresh, user]
+    [backendUrl, dashboardId, backoff, rls, clearRefreshTimer, debug, user]
   );
 
   // fetchGuestToken for SDK (uses our cache/refresh logic)
   const sdkFetchGuestToken = useMemo(() => {
-    return async () => {
+    return async (): Promise<string> => {
       const t = await getToken(false);
       if (debug)
         console.log(
@@ -199,7 +231,7 @@ export function useSupersetDashboard(opts: UseSupersetDashboardOpts) {
     };
   }, [getToken, debug]);
 
-  const reload = useCallback(async () => {
+  const reload = useCallback(() => {
     setLoading(true);
     setError(null);
     destroyRef.current();
@@ -225,7 +257,7 @@ export function useSupersetDashboard(opts: UseSupersetDashboardOpts) {
         // Prime token so we can fail early if backend is down
         await getToken(false);
 
-        const embedded = await embedDashboard({
+        const embedded = (await embedDashboard({
           id: dashboardId,
           supersetDomain: supersetUrl, // must equal token 'aud'
           mountPoint: ref.current,
@@ -237,15 +269,17 @@ export function useSupersetDashboard(opts: UseSupersetDashboardOpts) {
             filters: { expanded: true },
           },
           // debug,
-        });
+        })) as unknown;
 
         if (!cancelled) {
           destroyRef.current = toDestroyFn(embedded);
           setLoading(false);
         }
-      } catch (e: any) {
+      } catch (e: unknown) {
         if (!cancelled) {
-          setError(e?.message ?? 'Failed to load dashboard');
+          const errorMessage =
+            e instanceof Error ? e.message : 'Failed to load dashboard';
+          setError(errorMessage);
           setLoading(false);
         }
       }
