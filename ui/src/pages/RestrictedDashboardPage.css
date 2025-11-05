@@ -1,0 +1,107 @@
+.restricted-dashboard-page {
+  width: 100%;
+  min-height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+
+.restricted-dashboard-page__layout {
+  display: grid;
+  grid-template-columns: 250px 1fr 250px;
+  gap: 20px;
+  max-width: 1800px;
+  margin: 0 auto;
+  width: 100%;
+}
+
+.restricted-dashboard-page__dashboard {
+  width: 100%;
+  height: 600px; /* Fixed height for the dashboard */
+  overflow: hidden; /* Prevent overflow */
+}
+
+.restricted-dashboard-page__dashboard .superset-viewport {
+  height: 100% !important; /* Override 100vh to use container height */
+}
+
+.restricted-dashboard-page__sidebar {
+  padding: 20px;
+  background-color: #f5f5f5;
+  border-radius: 8px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+  height: fit-content;
+  max-height: 600px;
+  overflow-y: auto;
+}
+
+.restricted-dashboard-page__sidebar h2 {
+  margin-top: 0;
+  margin-bottom: 15px;
+  color: #282c34;
+  font-size: 1.5rem;
+}
+
+.restricted-dashboard-page__sidebar p {
+  line-height: 1.6;
+  color: #555;
+  margin-bottom: 15px;
+}
+
+.restricted-dashboard-page__sidebar-content {
+  margin-top: 20px;
+}
+
+.restricted-dashboard-page__sidebar-content h3 {
+  margin-top: 0;
+  margin-bottom: 10px;
+  color: #282c34;
+  font-size: 1.2rem;
+}
+
+.restricted-dashboard-page__sidebar-content ul {
+  margin: 0;
+  padding-left: 20px;
+  color: #555;
+}
+
+.restricted-dashboard-page__sidebar-content li {
+  margin-bottom: 8px;
+  line-height: 1.5;
+}
+
+.restricted-dashboard-page__content {
+  padding: 20px;
+  max-width: 1200px;
+  margin: 20px auto 0;
+  width: 100%;
+}
+
+.restricted-dashboard-page__content h2 {
+  margin-top: 0;
+  color: #282c34;
+}
+
+.restricted-dashboard-page__content p {
+  line-height: 1.6;
+  color: #555;
+  margin-bottom: 15px;
+}
+
+/* Responsive layout for smaller screens */
+@media (max-width: 1200px) {
+  .restricted-dashboard-page__layout {
+    grid-template-columns: 200px 1fr 200px;
+  }
+}
+
+@media (max-width: 768px) {
+  .restricted-dashboard-page__layout {
+    grid-template-columns: 1fr;
+    gap: 15px;
+  }
+
+  .restricted-dashboard-page__sidebar {
+    max-height: none;
+  }
+}

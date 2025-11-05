@@ -246,7 +246,13 @@ export function useSupersetDashboard(opts: UseSupersetDashboardOpts) {
 
     async function run() {
       if (!ref.current) return;
-      setLoading(true);
+
+      // Only set loading if there's no existing iframe
+      // This prevents showing loading overlay when content is already partially loaded
+      const existingIframe = ref.current.querySelector('iframe');
+      if (!existingIframe) {
+        setLoading(true);
+      }
       setError(null);
 
       // cleanup previous instance if any

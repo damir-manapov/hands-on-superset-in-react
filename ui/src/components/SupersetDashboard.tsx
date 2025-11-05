@@ -50,17 +50,17 @@ function Overlay({ children, style }: OverlayProps) {
       style={{
         position: 'absolute',
         inset: 0,
-        backgroundColor: 'rgba(255,255,255,0.7)', // More transparent so content can be seen
+        backgroundColor: 'rgba(255,255,255,0.5)', // Even more transparent so content is clearly visible
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         zIndex: 10,
         pointerEvents: 'none', // Allow interaction with content below
-        transition: 'opacity 0.3s ease-out', // Fade out smoothly
+        transition: 'opacity 0.2s ease-out, visibility 0.2s ease-out', // Fade out smoothly
         ...(style ?? {}),
       }}
     >
-      <p style={{ margin: 0 }}>{children}</p>
+      <p style={{ margin: 0, fontSize: '0.9rem', opacity: 0.8 }}>{children}</p>
     </div>
   );
 }
