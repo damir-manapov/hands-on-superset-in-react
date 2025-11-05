@@ -1,6 +1,7 @@
 import { NavLink, Routes, Route } from 'react-router-dom';
 import DashboardPage from './pages/DashboardPage';
 import RestrictedDashboardPage from './pages/RestrictedDashboardPage';
+import ChartsPage from './pages/ChartsPage';
 import './App.css';
 
 function App() {
@@ -21,6 +22,12 @@ function App() {
             className={({ isActive }) => (isActive ? 'active' : '')}
           >
             Restricted Dashboard
+          </NavLink>
+          <NavLink
+            to="/charts"
+            className={({ isActive }) => (isActive ? 'active' : '')}
+          >
+            Charts
           </NavLink>
         </nav>
       </header>
@@ -46,6 +53,14 @@ function App() {
           element={
             <main style={{ width: '100%', boxSizing: 'border-box' }}>
               <RestrictedDashboardPage />
+            </main>
+          }
+        />
+        <Route
+          path="/charts"
+          element={
+            <main style={{ width: '100%', boxSizing: 'border-box' }}>
+              <ChartsPage />
             </main>
           }
         />

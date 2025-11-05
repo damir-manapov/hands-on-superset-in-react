@@ -1,0 +1,17 @@
+.superset-chart {
+  position: relative;
+  width: 100%;
+  overflow: hidden;
+  background-color: #fff;
+  border-radius: 4px;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.superset-chart__iframe {
+  display: block;
+}
+
+.superset-chart__overlay {
+  position: absolute;
+  inset: 0;
+}
