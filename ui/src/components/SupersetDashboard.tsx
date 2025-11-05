@@ -1,220 +1,120 @@
-import { useEffect, useRef, useState } from 'react';
-import { embedDashboard } from '@superset-ui/embedded-sdk';
+import { useEffect, useRef, useState, useMemo } from 'react';
+import { embedDashboard, EmbeddedDashboard } from '@superset-ui/embedded-sdk';
 
 interface SupersetDashboardProps {
+  /** Embedded Dashboard UUID from “Enable Embedding” */
   dashboardId: string;
-  supersetUrl?: string;
-  backendUrl?: string;
+  /** Superset origin used for minting tokens; must match token's `aud` */
+  supersetUrl?: string; // e.g. 'http://localhost:8088'
+  /** Your backend origin that mints guest tokens */
+  backendUrl?: string;  // e.g. 'http://localhost:3001'
+  height?: number | string; // optional override
 }
 
-function SupersetDashboard({
+export default function SupersetDashboard({
   dashboardId,
   supersetUrl = 'http://localhost:8088',
   backendUrl = 'http://localhost:3001',
+  height = 800,
 }: SupersetDashboardProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
+  const mountRef = useRef<HTMLDivElement | null>(null);
+  const destroyRef = useRef<null | (() => void)>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    let mounted = true;
+  // Stable fetcher instance (avoids re-embedding loops)
+  const fetchGuestToken = useMemo(() => {
+    return async (): Promise<string> => {
+      const res = await fetch(`${backendUrl}/api/superset/guest-token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include', // <— recommended; harmless if backend doesn’t use cookies
+        body: JSON.stringify({
+          resources: [{ type: 'dashboard' as const, id: dashboardId }],
+          user: { username: 'guest', first_name: 'Guest', last_name: 'User' },
+          rls: [],
+        }),
+      });
 
-    // Function to fetch guest token - will be called by SDK when needed
-    async function fetchGuestToken(): Promise<string> {
-      console.log('[SupersetDashboard] fetchGuestToken called');
-      console.log(
-        '[SupersetDashboard] Fetching from:',
-        `${backendUrl}/api/superset/guest-token`
-      );
-
-      try {
-        const response = await fetch(`${backendUrl}/api/superset/guest-token`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            resources: [
-              {
-                type: 'dashboard',
-                id: dashboardId,
-              },
-            ],
-            user: {
-              username: 'guest',
-              first_name: 'Guest',
-              last_name: 'User',
-            },
-            rls: [],
-          }),
-        });
-
-        console.log('[SupersetDashboard] Response status:', response.status);
-
-        if (!response.ok) {
-          const errorText = await response.text();
-          console.error('[SupersetDashboard] Error response:', errorText);
-          throw new Error(
-            `Failed to get guest token: ${response.status} ${response.statusText} - ${errorText}`
-          );
-        }
-
-        const data = (await response.json()) as { token: string };
-        console.log(
-          '[SupersetDashboard] Token received, length:',
-          data.token.length
-        );
-        return data.token;
-      } catch (err) {
-        console.error('[SupersetDashboard] fetchGuestToken error:', err);
-        throw err;
+      if (!res.ok) {
+        const text = await res.text().catch(() => '');
+        throw new Error(`Guest token failed: ${res.status} ${res.statusText} ${text}`);
       }
-    }
+      const data = (await res.json()) as { token: string };
+      if (!data?.token) throw new Error('Guest token missing in response');
+      return data.token;
+    };
+  }, [backendUrl, dashboardId]);
 
-    async function loadDashboard() {
+  useEffect(() => {
+    let cancelled = false;
+  
+    async function run() {
+      if (!mountRef.current) return;
+      setLoading(true);
+      setError(null);
+  
+      // clear any prior embed
+      destroyRef.current?.();
+      destroyRef.current = null;
+  
       try {
-        console.log('[SupersetDashboard] Starting to load dashboard');
-        console.log('[SupersetDashboard] Dashboard ID:', dashboardId);
-        console.log('[SupersetDashboard] Superset URL:', supersetUrl);
-        console.log('[SupersetDashboard] Backend URL:', backendUrl);
-
-        setLoading(true);
-        setError(null);
-
-        // Wait for container ref to be available
-        if (!containerRef.current) {
-          console.warn(
-            '[SupersetDashboard] Container ref not available, waiting...'
-          );
-          // Use requestAnimationFrame to wait for next render
-          requestAnimationFrame(() => {
-            if (mounted && containerRef.current) {
-              void loadDashboard();
-            }
-          });
-          return;
-        }
-
-        console.log('[SupersetDashboard] Container ref is available');
-
-        // Test fetchGuestToken directly first
-        console.log('[SupersetDashboard] Testing fetchGuestToken directly...');
-        try {
-          const testToken = await fetchGuestToken();
-          console.log(
-            '[SupersetDashboard] Direct fetchGuestToken test succeeded, token length:',
-            testToken.length
-          );
-        } catch (testErr) {
-          console.error(
-            '[SupersetDashboard] Direct fetchGuestToken test failed:',
-            testErr
-          );
-          throw testErr;
-        }
-
-        // Embed the dashboard
-        // The SDK will call fetchGuestToken when needed
-        console.log('[SupersetDashboard] About to call embedDashboard with:', {
+        const embedded = await embedDashboard({
           id: dashboardId,
           supersetDomain: supersetUrl,
-          mountPoint: containerRef.current ? 'exists' : 'null',
-        });
-
-        const result = await embedDashboard({
-          id: dashboardId,
-          supersetDomain: supersetUrl,
-          mountPoint: containerRef.current,
+          mountPoint: mountRef.current,
           fetchGuestToken,
-          dashboardUiConfig: {
-            hideTitle: false,
-            hideChartControls: false,
-            hideTab: false,
-            filters: {
-              expanded: true,
-            },
-          },
-          debug: true, // Enable debug mode
+          dashboardUiConfig: { hideTitle: false, hideChartControls: false, hideTab: false, filters: { expanded: true } },
         });
-
-        console.log('[SupersetDashboard] embedDashboard result:', result);
-        console.log('[SupersetDashboard] embedDashboard completed');
-
-        // Don't set loading to false immediately - let the SDK handle it
-        // The SDK might need time to load the dashboard
-        setTimeout(() => {
-          if (mounted) {
-            setLoading(false);
+  
+        // make a unified destroy function regardless of SDK shape
+        const makeDestroy = (obj: unknown): (() => void) => {
+          // v1: object with destroy()
+          if (obj && typeof obj === 'object' && 'destroy' in obj && typeof (obj as any).destroy === 'function') {
+            return () => (obj as any).destroy();
           }
-        }, 1000);
-      } catch (err) {
-        console.error('[SupersetDashboard] Error embedding dashboard:', err);
-        if (mounted) {
-          setError(
-            err instanceof Error ? err.message : 'Failed to load dashboard'
-          );
+          // some builds: object with unmount()
+          if (obj && typeof obj === 'object' && 'unmount' in obj && typeof (obj as any).unmount === 'function') {
+            return () => (obj as any).unmount();
+          }
+          // older examples (rare): returned a function
+          if (typeof obj === 'function') {
+            return obj as () => void;
+          }
+          // fallback no-op
+          return () => {};
+        };
+  
+        if (!cancelled) {
+          destroyRef.current = makeDestroy(embedded as unknown as EmbeddedDashboard);
+          setLoading(false);
+        }
+      } catch (e: any) {
+        if (!cancelled) {
+          setError(e?.message ?? 'Failed to load dashboard');
           setLoading(false);
         }
       }
     }
-
-    // Wait a bit for the ref to be attached
-    const timer = setTimeout(() => {
-      if (mounted && containerRef.current) {
-        void loadDashboard();
-      } else {
-        console.warn(
-          '[SupersetDashboard] Container ref not available after timeout'
-        );
-      }
-    }, 0);
-
+  
+    void run();
     return () => {
-      clearTimeout(timer);
-      mounted = false;
+      cancelled = true;
+      destroyRef.current?.();
+      destroyRef.current = null;
     };
-  }, [dashboardId, supersetUrl, backendUrl]);
+  }, [dashboardId, supersetUrl, fetchGuestToken]);
 
   return (
-    <div style={{ position: 'relative', width: '100%', height: '800px' }}>
-      {/* Always render the container so ref is available */}
-      <div ref={containerRef} style={{ width: '100%', height: '100%' }} />
-      {/* Show loading overlay */}
+    <div style={{ position: 'relative', width: '100%', height: typeof height === 'number' ? `${height}px` : height }}>
+      <div ref={mountRef} style={{ width: '100%', height: '100%' }} />
       {loading && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10,
-          }}
-        >
-          <p>Loading dashboard...</p>
+        <div style={overlayStyle}>
+          <p>Loading dashboard…</p>
         </div>
       )}
-      {/* Show error overlay */}
       {error && (
-        <div
-          style={{
-            position: 'absolute',
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            backgroundColor: 'rgba(255, 255, 255, 0.9)',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            zIndex: 10,
-            color: 'red',
-          }}
-        >
+        <div style={{ ...overlayStyle, color: 'red' }}>
           <p>Error: {error}</p>
         </div>
       )}
@@ -222,4 +122,12 @@ function SupersetDashboard({
   );
 }
 
-export default SupersetDashboard;
+const overlayStyle: React.CSSProperties = {
+  position: 'absolute',
+  inset: 0,
+  backgroundColor: 'rgba(255,255,255,0.9)',
+  display: 'flex',
+  alignItems: 'center',
+  justifyContent: 'center',
+  zIndex: 10,
+};

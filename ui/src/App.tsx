@@ -4,7 +4,7 @@ import './App.css';
 function App() {
   // Dashboard UUID - use UUID instead of numeric ID for embedded SDK
   // Get this from Superset UI: Dashboard > Settings > Embedded Dashboard
-  const dashboardId = '3a504031-72ab-4f46-bfb7-277051c5919b';
+  const dashboardId = '535afce7-d1d2-4774-9707-d7bc3929c8e0';
 
   return (
     <div className="App">
