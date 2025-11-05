@@ -25,7 +25,7 @@ function SupersetDashboard({
       style={{
         position: 'relative',
         width: '100%',
-        height: `calc(100vh - ${offsetTop}px)`, // full screen minus header if any
+        height: '100vh',
       }}
     >
       <div
