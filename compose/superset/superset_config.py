@@ -26,8 +26,3 @@ TALISMAN_CONFIG = {
 # Guest role configuration for embedded Superset
 GUEST_ROLE_NAME = "Gamma"
 
-# Disable CSRF protection for API endpoints
-# This is required for embedded Superset to work with API calls
-# The backend handles authentication via Bearer tokens, so CSRF is not needed
-WTF_CSRF_ENABLED = False
-
