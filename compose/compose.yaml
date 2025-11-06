@@ -16,8 +16,36 @@ services:
       superset:
         condition: service_healthy
     entrypoint: ["/bin/sh", "-c"]
-    command: >-
-      "echo 'All services are healthy. You can now connect Superset to Trino.'"
+    command:
+      - |
+        echo "============================================================"
+        echo " All services are healthy. Local endpoints and credentials:"
+        echo "============================================================"
+        echo ""
+        echo "MinIO (S3 storage):"
+        echo "  - Console UI:   http://localhost:9001"
+        echo "  - S3 API:       http://localhost:9000"
+        echo "  - Credentials:  admin / admin12345"
+        echo ""
+        echo "Project Nessie (Iceberg catalog):"
+        echo "  - REST API:     http://localhost:19120"
+        echo ""
+        echo "Trino (Query Engine):"
+        echo "  - Web UI:       http://localhost:8080"
+        echo "  - CLI example:  docker compose -f compose/compose.yaml exec trino trino"
+        echo ""
+        echo "Superset (BI Platform):"
+        echo "  - Web UI:       http://localhost:8088"
+        echo "  - Credentials:  admin / admin12345"
+        echo ""
+        echo "App services (run locally):"
+        echo "  - Backend (NestJS): http://localhost:3001   → pnpm dev:back"
+        echo "  - Frontend (React): http://localhost:3000   → pnpm dev:ui"
+        echo ""
+        echo "Notes:"
+        echo "  - Superset is preconfigured to allow embedding from http://localhost:3000 and http://127.0.0.1:3000"
+        echo "  - A demo dashboard and datasets are initialized; embedding is enabled"
+        echo "============================================================"
     networks:
       - lakehouse
 
