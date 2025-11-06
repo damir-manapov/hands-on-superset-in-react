@@ -1,20 +1,25 @@
 ## Hands-on: Embedding Superset in React
 
-This project demonstrates how to embed Apache Superset dashboards and charts into a React application. It includes a NestJS backend for handling Superset API authentication and a React frontend that embeds Superset visualizations.
+This is a reference implementation for embedding a Superset dashboard into a React page.
+
+The dashboard takes up all available space and adapts to the window size. When the page is rendered, a token is issued to the user for accessing the dashboard. The token is valid only for this specific dashboard. Additionally, embedding must be enabled for the dashboard, and the domains where embedding is allowed must be specified.
+
+**Note on individual charts**: We also attempted to embed individual charts, but it appears this cannot be done with authorization - only if they are published globally for everyone. As a workaround, we created a dashboard with a single chart and disabled control elements, but it was not possible to completely remove the filter panel, only to make it collapsed.
 
 This project is a pnpm monorepo containing:
 
-- **back**: NestJS backend application (handles Superset API authentication and proxying)
-- **ui**: React frontend application (embeds Superset dashboards and charts)
+- **back**: NestJS backend application (issues Superset guest tokens and exposes dashboard UUID lookup)
+- **ui**: React frontend application (embeds Superset dashboards)
 
 ## Overview
 
-This project shows how to:
+This project demonstrates:
 
-1. Set up Apache Superset with a data stack (Trino + Iceberg + MinIO)
-2. Embed Superset dashboards and charts into a React application
-3. Handle authentication and API proxying through a NestJS backend
-4. Create a seamless integration experience
+1. Setting up Apache Superset with a data stack (Trino + Iceberg + MinIO)
+2. Embedding Superset dashboards into a React application with proper authentication
+3. Handling guest token issuance in a NestJS backend (refresh handled client-side)
+4. Programmatically enabling dashboard embedding with domain restrictions
+5. Creating a seamless full-page integration experience
 
 ## Architecture
 
@@ -26,7 +31,7 @@ This project shows how to:
          │
          ▼
 ┌─────────────────┐
-│  NestJS Backend │  ← Handles Superset API auth & proxying
+│  NestJS Backend │  ← Issues guest tokens & UUID lookup (no proxy)
 │   (Port 3001)   │
 └────────┬────────┘
          │
@@ -107,12 +112,15 @@ pnpm format:check
 
 ## Infrastructure Stack
 
-The Docker Compose setup includes:
+The Docker Compose setup initializes:
 
+- **MinIO**: S3-compatible object storage (`http://localhost:9000`, console on `http://localhost:9001`)
+- **Iceberg**: Data lake format (via Trino)
 - **Superset**: BI/Visualization platform (`http://localhost:8088`)
   - Default credentials: `admin` / `admin12345`
+  - Automatically creates: database connection, charts, and dashboard
+  - Enables embedding for the dashboard with permission to request from localhost
 - **Trino**: Query engine for data access (`http://localhost:8080`)
-- **MinIO**: S3-compatible object storage (`http://localhost:9000`, console on `http://localhost:9001`)
 - **Project Nessie**: Iceberg catalog for data versioning (`http://localhost:19120`)
 
 ### Infrastructure Quickstart
@@ -136,9 +144,19 @@ The Docker Compose setup includes:
 
 ## Setting Up Superset Data Source
 
-### Connect Superset to Trino
+### Automatic Setup
 
-Once Superset is healthy:
+The Superset initialization script (`compose/superset/init_db.py`) automatically:
+
+1. Creates a Trino database connection
+2. Creates datasets
+3. Creates charts
+4. Creates a dashboard
+5. Enables embedding for the dashboard with allowed domains set to `http://localhost:3000` and `http://127.0.0.1:3000`
+
+### Manual Setup (if needed)
+
+If you need to manually connect Superset to Trino:
 
 1. Open `http://localhost:8088` and log in (`admin` / `admin12345`)
 2. Go to **Settings → Data → Databases → + Database**
@@ -186,17 +204,24 @@ SELECT * FROM iceberg.demo.events;
 
 ## Embedding Superset in React
 
-The React application (`ui/`) demonstrates how to embed Superset dashboards and charts. The NestJS backend (`back/`) provides:
+The React application (`ui/`) demonstrates how to embed Superset dashboards. The dashboard fills the entire available space and adapts to the window size. The NestJS backend (`back/`) provides:
 
-- Authentication with Superset API
-- Secure API proxy to avoid CORS issues
-- Token management and refresh
+- Guest token generation for dashboard access (scoped to specific dashboard)
+- Dashboard UUID lookup by slug
+  
+Token refresh is managed by the UI using the Superset Embedded SDK; the backend does not proxy Superset APIs and does not manage refresh.
+
+**Key Features:**
+- Full-page dashboard embedding that adapts to window size
+- Secure token-based authentication (guest tokens valid only for the specific dashboard)
+- Domain-restricted embedding (configured during initialization)
+- Automatic token refresh before expiration
 
 ### Project Structure
 
 ```
 .
-├── back/          # NestJS backend (Superset API proxy & auth)
+├── back/          # NestJS backend (guest token issuance & UUID lookup)
 ├── ui/            # React frontend (embeds Superset components)
 ├── compose/       # Docker Compose setup for infrastructure
 └── package.json   # Root workspace configuration
@@ -214,5 +239,7 @@ docker compose -f compose/compose.yaml down -v
 
 - All credentials in this setup are for local development only. Change them for any persistent/shared use.
 - Superset uses its container-managed SQLite metadata DB for simplicity.
-- The backend should be configured with Superset credentials to handle authentication.
-- The React app uses iframe embedding or Superset's embedding SDK (depending on implementation).
+- The backend is configured with Superset credentials to handle guest token generation.
+- The React app uses Superset's `@superset-ui/embedded-sdk` for dashboard embedding.
+- Dashboard embedding is automatically enabled during initialization with domain restrictions.
+- Individual chart embedding with authorization is not supported; use dashboards with single charts as a workaround.
