@@ -9,7 +9,13 @@ The dashboard takes up all available space and adapts to the window size. When t
 This project is a pnpm monorepo containing:
 
 - **back**: NestJS backend application (issues Superset guest tokens and exposes dashboard UUID lookup)
-- **ui**: React frontend application (embeds Superset dashboards)
+ - **ui**: React frontend application (embeds Superset dashboards)
+
+## TODO
+
+- Create more restricted role for accessing dashboards
+- Remove ESLint disablings
+
 
 ## Overview
 
